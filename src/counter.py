@@ -140,13 +140,10 @@ class Counter(object):
         height = self.dataset.height
         line_down = int(9*(height/10))
         self.line_down = line_down
-        tracker = None
         if self.tracking_alg == 'sort':
             tracker = Sort(max_age=self.max_age,
                            line_down=line_down,
-                           movie_id=movie_id,
                            save_image_dir='./runs',
-                           movie_date='',
                            basename=basename,
                            min_hits=3)
         else:
@@ -277,7 +274,7 @@ class Counter(object):
                 dets_results.append(np.array(cord))
                 conf_results.append(conf)
 
-            if self.save_movie:
+            if self.save_movie and self.counting_mode != 'v2':
                 if self.vid_path != save_path:  # new video
                     self.vid_path = save_path
                     if isinstance(self.vid_writer, cv2.VideoWriter):
@@ -317,3 +314,6 @@ class Counter(object):
                 self.vid_writer.write(im0)
 
         return np.array(dets_results)
+
+    def logging_count_num(self, cnt_down, save_dir, movie_path):
+        pass

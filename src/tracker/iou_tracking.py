@@ -2,30 +2,23 @@
 import numpy as np
 import cv2
 from .trash import Trash
-from .fpsrate import FpsWithTick
 import os
 import sys
-if True:
-    sys.path.append('../')
-    from utils.count_utils import convert_to_latlng
 
 
 class Iou_Tracker(object):
-    def __init__(self, max_age=2, line_down=None, save_image_dir=None, movie_id=None, movie_date='', base_name='', save_movie_dir=None):
+    def __init__(self,
+                 max_age=2,
+                 line_down=None,
+                 save_image_dir=None,
+                 base_name=''):
         self.line_down = line_down
         self.save_image_dir = save_image_dir
-        self.save_movie_dir = save_movie_dir
-        self.movie_id = movie_id
         self.cnt_down = 0
-        self.frame_count = 0
         self.trashs = []
         self.max_age = int(max_age)
         self.t_id = 0
         self.font = cv2.FONT_HERSHEY_DUPLEX
-        self.frame_count = 0
-        self.fps_count = 0
-        self.fpsWithTick = FpsWithTick()
-        self.movie_date = movie_date
         self.base_name = base_name
 
     def intersection_over_union(self, boxA, boxB):
@@ -125,7 +118,6 @@ class Iou_Tracker(object):
             i.age += 1
             if i.age > self.max_age:
                 i.done = True
-
             if i.center[1] > self.line_down:
                 i.done = True
             if i.done:

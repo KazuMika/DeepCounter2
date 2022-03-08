@@ -5,14 +5,9 @@ import numpy as np
 import time
 from filterpy.kalman import KalmanFilter
 import cv2
-import sys
-
 from .fpsrate import FpsWithTick
 import os
 import warnings
-if True:
-    sys.path.append('../')
-    from utils.count_utils import convert_to_latlng
 
 warnings.simplefilter('ignore')
 
@@ -123,11 +118,8 @@ class KalmanBoxTracker(object):
 class Sort(object):
     def __init__(self, max_age=2,
                  line_down=None,
-                 movie_id='',
                  save_image_dir=None,
-                 movie_date='',
                  basename='',
-                 save_movie_dir=None,
                  min_hits=3):
         """
         Sets key parameters for SORT
@@ -137,73 +129,24 @@ class Sort(object):
         self.trackers = []
         self.line_down = line_down
         self.cnt_down = 0
-        self.movie_id = movie_id
         self.save_image_dir = save_image_dir
-        self.save_movie_dir = save_movie_dir
         self.frame_count = 0
         self.fps_count = 0
         self.fpsWithTick = FpsWithTick()
         self.font = cv2.FONT_HERSHEY_DUPLEX
-        self.movie_date = movie_date
         self.basename = basename
 
-    def going_down(self, pre_y, y, frame=None, gpss=None, gps_count=None, gps_list=None, visualize=None, prediction2=None, demo=False, time_stamp=None, fps_eval=None):
+    def going_down(self, pre_y, y, frame=None):
         if y > self.line_down and pre_y <= self.line_down:
             self.cnt_down += 1
-            if fps_eval:
-                return True
-
+            print('count:{}'.format(self.cnt_down))
             cv2.imwrite(os.path.join(self.save_image_dir, self.basename+self.movie_date +
                                      "_{0:04d}_{1:03d}.jpg".format(self.frame_count, self.cnt_down)), frame)
-            print('count:{}'.format(self.cnt_down))
-            if demo:
-                img_name = time_stamp + \
-                    '_{0:04d}.jpg'.format(
-                        self.cnt_down)
-                str_down = 'COUNT:' + str(self.cnt_down)
-                cv2.putText(frame, str_down, (10, 70), self.font,
-                            2.0, (0, 0, 0), 10, cv2.LINE_AA)
-                cv2.putText(frame, str_down, (10, 70), self.font,
-                            2.0, (255, 255, 255), 8, cv2.LINE_AA)
-                cv2.putText(frame, time_stamp, (900, 40), self.font,
-                            1.0, (0, 0, 0), 5, cv2.LINE_AA)
-                cv2.putText(frame, time_stamp, (900, 40), self.font,
-                            1.0, (255, 255, 255), 4, cv2.LINE_AA)
-                cv2.imwrite(
-                    self.save_image_dir+img_name, frame)
-                prediction2.append(
-                    (time_stamp, self.cnt_down))
-            else:
-                cv2.imwrite(os.path.join(self.save_image_dir, self.basename+self.movie_date +
-                                         "_{0:04d}_{1:03d}.jpg".format(self.frame_count, self.cnt_down)), frame)
-            if visualize:
-                try:
-                    lat = gpss[gps_count].split(',')[0][1:]
-                    lng = gpss[gps_count].split(',')[1]
-                    lat, lng = convert_to_latlng(lat, lng)
-                    print(lat, lng)
-                    date_gps = self.movie_date + \
-                        "_{0:04d}".format(self.cnt_down)
-                except:
-                    lat, lng = 0, 0
-                    date_gps = self.movie_date + \
-                        "_{0:04d}".format(self.cnt_down)
-                gps_list.append([lat, lng, date_gps])
             return True
         else:
             return False
 
-    def update(self,
-               dets=np.empty((0, 5)),
-               frame=None,
-               gpss=None,
-               gps_count=None,
-               visualize=False,
-               gps_list=None,
-               prediction2=None,
-               time_stamp=None,
-               demo=False,
-               fps_eval=False):
+    def update(self, dets, frame=None):
 
         # get predicted locations from existing trackers.
         if len(dets) == 0:
@@ -237,49 +180,16 @@ class Sort(object):
                 trk = KalmanBoxTracker(dets[i, :])
                 self.trackers.append(trk)
         i = len(self.trackers)
+        for trk in reversed(self.trackers):
+            trk.x, trk.y = trk.center_cord()
+            d = trk.get_state()[0].astype(np.int)
+            i -= 1
+            trk.done = self.going_down(trk.pre_y, trk.y, frame)
 
-        if fps_eval:
-            for trk in reversed(self.trackers):
-                trk.x, trk.y = trk.center_cord()
-                trk.done = self.going_down(trk.pre_y, trk.y, fps_eval=fps_eval)
-                d = trk.get_state()[0].astype(np.int)
-                i -= 1
-                if(trk.time_since_update > self.max_age) or trk.done:
-                    self.trackers.pop(i)
+            if(trk.time_since_update > self.max_age) or trk.done:
+                self.trackers.pop(i)
 
-            self.fps1 = self.fpsWithTick.get()
-            self.fps_count += self.fps1
-            self.frame_count += 1
-
-            if self.frame_count == 0:
-                self.frame_count += 1
-        else:
-            for trk in reversed(self.trackers):
-                trk.x, trk.y = trk.center_cord()
-                d = trk.get_state()[0].astype(np.int)
-                i -= 1
-                cv2.circle(frame, (trk.x, trk.y), 3, (0, 0, 126), -1)
-                cv2.rectangle(
-                    frame, (d[0], d[1]), (d[2], d[3]), (0, 252, 124), 2)
-
-                cv2.rectangle(frame, (d[0], d[1] - 20),
-                              (d[0] + 170, d[1]), (0, 252, 124), thickness=2)
-                cv2.rectangle(frame, (d[0], d[1] - 20),
-                              (d[0] + 170, d[1]), (0, 252, 124), -1)
-                cv2.putText(frame, str(trk.id+1) + " " + str(trk.time_since_update)+" ",
-                            (d[0], d[1] - 5), self.font, 0.6, (0, 0, 0), 1, cv2.LINE_AA)
-                str_down = 'COUNT:' + str(self.cnt_down+1)
-                cv2.line(frame, (0, self.line_down),
-                         (int(frame.shape[1]), self.line_down), (255, 0, 0), 2)
-                cv2.putText(frame, str_down, (10, 70), self.font,
-                            2.5, (0, 0, 0), 10, cv2.LINE_AA)
-                cv2.putText(frame, str_down, (10, 70), self.font,
-                            2.5, (255, 255, 255), 8, cv2.LINE_AA)
-                trk.done = self.going_down(
-                    trk.pre_y, trk.y, frame, gpss, gps_count,  gps_list, visualize, prediction2, demo=demo, time_stamp=time_stamp, fps_eval=fps_eval)
-
-                if(trk.time_since_update > self.max_age) or trk.done:
-                    self.trackers.pop(i)
+        return self.cnt_down
 
 
 @jit

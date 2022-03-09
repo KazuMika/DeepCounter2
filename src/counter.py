@@ -45,7 +45,7 @@ class Counter(object):
         self.count_result = 'count_result.csv'
         (self.save_dir / self.detected_images).mkdir(parents=True, exist_ok=True)  # make dir
         (self.save_dir / self.detected_movies).mkdir(parents=True, exist_ok=True)  # make dir
-        if not os.path.exists(str(self.save_dir/self.count_result)):
+        if not os.path.exists(str(self.save_dir / self.count_result)):
             (self.save_dir / self.count_result).touch(exist_ok=True)
         self.csv_writer = csv.writer(open(str(self.save_dir / self.count_result), 'a'))
 
@@ -75,7 +75,8 @@ class Counter(object):
             self.model.half()  # to FP16
 
         if self.device.type != 'cpu':
-            self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(self.device).type_as(next(self.model.parameters())))  # run once
+            self.model(torch.zeros(1, 3, self.imgsz, self.imgsz).to(
+                self.device).type_as(next(self.model.parameters())))  # run once
         if self.mode == 'webcam':
             self.movies = []
             self.webcam = True
@@ -173,11 +174,10 @@ class Counter(object):
         if self.counting_mode == 'v1':
             tracker = self.get_tracker(movie_path)
         elif self.counting_mode == 'v2':
-            print(len(movie_path))
             t1 = threading.Thread(target=self.jumpQ, args=(movie_path,))
             t1.start()
 
-        for path, img, im0s, vid_cap in self.dataset:
+        for path, img, im0s, vid_cap, s in self.dataset:
             self.vid_cap = vid_cap
 
             img2 = img.copy()
@@ -266,7 +266,8 @@ class Counter(object):
         img, im0s, path = images
         pred = self.model(img, augment=self.opt.augment)[0]
 
-        pred = non_max_suppression(pred, self.opt.conf_thres, self.opt.iou_thres, classes=self.opt.classes, agnostic=self.opt.agnostic_nms)
+        pred = non_max_suppression(pred, self.opt.conf_thres, self.opt.iou_thres,
+                                   classes=self.opt.classes, agnostic=self.opt.agnostic_nms)
 
         dets_results = []
         conf_results = []

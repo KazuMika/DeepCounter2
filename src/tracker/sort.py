@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 from numba import jit
+import os
 import numpy as np
 import time
 from filterpy.kalman import KalmanFilter
 import cv2
 from .fpsrate import FpsWithTick
-import os
 import warnings
+from .utils import creat_detected_image
 
 warnings.simplefilter('ignore')
 
@@ -116,8 +117,9 @@ class KalmanBoxTracker(object):
 
 
 class Sort(object):
-    def __init__(self, max_age=2,
-                 line_down=None,
+    def __init__(self,
+                 max_age,
+                 line_down,
                  save_image_dir=None,
                  basename='',
                  min_hits=3):
@@ -129,7 +131,7 @@ class Sort(object):
         self.trackers = []
         self.line_down = line_down
         self.cnt_down = 0
-        self.save_image_dir = save_image_dir
+        self.save_image_dir = os.path.join(save_image_dir, basename)
         self.frame_count = 0
         self.fps_count = 0
         self.fpsWithTick = FpsWithTick()
@@ -140,8 +142,6 @@ class Sort(object):
         if y > self.line_down and pre_y <= self.line_down:
             self.cnt_down += 1
             print('count:{}'.format(self.cnt_down))
-            cv2.imwrite(os.path.join(self.save_image_dir, self.basename+self.movie_date +
-                                     "_{0:04d}_{1:03d}.jpg".format(self.frame_count, self.cnt_down)), frame)
             return True
         else:
             return False
@@ -185,6 +185,9 @@ class Sort(object):
             d = trk.get_state()[0].astype(np.int)
             i -= 1
             trk.done = self.going_down(trk.pre_y, trk.y, frame)
+            if trk.done:
+                creat_detected_image(frame, trk, self.line_down,
+                                     self.cnt_down, self.save_image_dir)
 
             if(trk.time_since_update > self.max_age) or trk.done:
                 self.trackers.pop(i)

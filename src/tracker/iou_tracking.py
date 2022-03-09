@@ -2,18 +2,18 @@
 import numpy as np
 import cv2
 from .trash import Trash
+from .utils import creat_detected_image
 import os
-import sys
 
 
 class Iou_Tracker(object):
     def __init__(self,
-                 max_age=2,
-                 line_down=None,
+                 max_age,
+                 line_down,
                  save_image_dir=None,
                  base_name=''):
         self.line_down = line_down
-        self.save_image_dir = save_image_dir
+        self.save_image_name = os.path.join(save_image_dir, base_name)
         self.cnt_down = 0
         self.trashs = []
         self.max_age = int(max_age)
@@ -105,6 +105,8 @@ class Iou_Tracker(object):
                             if i.going_DOWN(self.line_down):
                                 if i.state:
                                     self.cnt_down += 1
+                                    creat_detected_image(frame, i, self.line_down,
+                                                         self.cnt_down, self.save_image_name)
                                     i.state = False
                                     i.done = True
                                     print("ID:", i.id, 'crossed', self.cnt_down)

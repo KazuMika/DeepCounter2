@@ -2,12 +2,14 @@
 import os
 import threading
 import random
+import time
 from collections import deque
 import cv2
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import glob
+import csv
 
 from tracker.sort import Sort
 from tracker.iou_tracking import Iou_Tracker
@@ -16,7 +18,7 @@ from pathlib import Path
 from yolov5.models.experimental import attempt_load
 from yolov5.utils.datasets import LoadStreams, LoadImages
 from yolov5.utils.general import check_img_size, check_imshow, non_max_suppression, \
-    scale_coords,  set_logging, increment_path
+    scale_coords, set_logging, increment_path
 from yolov5.utils.torch_utils import select_device
 
 cudnn.benchmark = True
@@ -38,13 +40,20 @@ class Counter(object):
             opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, opt.save_movie
         self.save_dir = Path(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok))  # increment run
         self.save_dir.mkdir(parents=True, exist_ok=True)  # make dir
-        (self.save_dir / 'detected_images').mkdir(parents=True, exist_ok=True)  # make dir
-        (self.save_dir / 'detected_movies').mkdir(parents=True, exist_ok=True)  # make dir
+        self.detected_images = 'detected_images'
+        self.detected_movies = 'detected_movies'
+        self.count_result = 'count_result.csv'
+        (self.save_dir / self.detected_images).mkdir(parents=True, exist_ok=True)  # make dir
+        (self.save_dir / self.detected_movies).mkdir(parents=True, exist_ok=True)  # make dir
+        if not os.path.exists(str(self.save_dir/self.count_result)):
+            (self.save_dir / self.count_result).touch(exist_ok=True)
+        self.csv_writer = csv.writer(open(str(self.save_dir / self.count_result), 'a'))
+
         self.mode = opt.mode
         self.counting_mode = opt.counting_mode
 
         # for jumpQ
-        self.is_movie_opened = True
+        self.is_movie_opened = False
         self.queue_images = deque()
 
         set_logging()
@@ -109,12 +118,15 @@ class Counter(object):
         with torch.no_grad():
             if self.webcam:
                 movie = '0'
+                self.is_movie_opened = True
                 self.view_img = check_imshow()
                 cudnn.benchmark = True
                 self.dataset = LoadStreams(movie, img_size=self.imgsz, stride=self.stride)
                 self.counting(movie)
             else:
                 for movie_path in self.movies:
+                    print(movie_path)
+                    self.is_movie_opened = True
                     self.dataset = LoadImages(movie_path, img_size=self.imgsz, stride=self.stride)
                     self.counting(movie_path)
 
@@ -135,28 +147,25 @@ class Counter(object):
 
         """
         basename = os.path.basename(movie_path).replace('.mp4', '')
-        movie_id = basename[0:4]
-        self.image_dir = self.save_dir
         height = self.dataset.height
-        line_down = int(9*(height/10))
+        line_down = int(9 * (height / 10))
         self.line_down = line_down
+        save_image_dir = str(self.save_dir / self.detected_images)
         if self.tracking_alg == 'sort':
             tracker = Sort(max_age=self.max_age,
                            line_down=line_down,
-                           save_image_dir='./runs',
+                           save_image_dir=save_image_dir,
                            basename=basename,
                            min_hits=3)
         else:
             tracker = Iou_Tracker(max_age=self.max_age,
                                   line_down=line_down,
-                                  save_image_dir=self.image_dir,
-                                  movie_id=movie_id,
-                                  movie_date='',
+                                  save_image_dir=save_image_dir,
                                   base_name=basename)
 
         return tracker
 
-    def counting(self,  movie_path):
+    def counting(self, movie_path):
         """
 
         """
@@ -186,6 +195,11 @@ class Counter(object):
                 self.queue_images.append([img, im0s, path, img2])
 
         self.is_movie_opened = False
+        # save result to csv
+        while len(self.queue_images) >= 1:
+            time.sleep(1)
+        self.csv_writer.writerow([movie_path.split('/')[-1], self.cnt_down])
+        self.cnt_down = 0
 
     def jumpQ(self, movie_path):
         """
@@ -264,7 +278,7 @@ class Counter(object):
                 p, s, im0, _ = path, '', im0s, getattr(self.dataset, 'frame', 0)
 
             p = Path(p)  # to Path
-            save_path = str(self.save_dir / p.name)  # img.jpg
+            save_path = str(self.save_dir / self.detected_movies / p.name)  # img.jpg
             s += '%gx%g ' % img.shape[2:]  # print string
             dets[:, :4] = scale_coords(img.shape[2:], dets[:, :4], im0.shape).round()
             for *det, conf, cls in reversed(dets):
@@ -286,7 +300,7 @@ class Counter(object):
                     else:  # stream
                         fps, w, h = 30, im0.shape[1], im0.shape[0]
                         save_path += '.mp4'
-                    self.vid_writer = cv2.VideoWriter('test.mp4', cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
+                    self.vid_writer = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
 
                 str_down = 'COUNT:' + str(self.cnt_down)
                 cv2.line(im0, (0, self.line_down),
@@ -297,8 +311,8 @@ class Counter(object):
                             2.0, (255, 255, 255), 8, cv2.LINE_AA)
 
                 for d, conf in zip(dets_results, conf_results):
-                    center_x = (d[0]+d[2])//2
-                    center_y = (d[1]+d[3])//2
+                    center_x = (d[0] + d[2]) // 2
+                    center_y = (d[1] + d[3]) // 2
                     if self.line_down >= center_y:
                         cv2.circle(im0, (center_x, center_y), 3, (0, 0, 126), -1)
                         cv2.rectangle(
@@ -308,12 +322,9 @@ class Counter(object):
                                       (d[0] + 60, d[1]), (0, 252, 124), thickness=2)
                         cv2.rectangle(im0, (d[0], d[1] - 20),
                                       (d[0] + 60, d[1]), (0, 252, 124), -1)
-                        cv2.putText(im0, str(int(conf.item() * 100))+'%',
+                        cv2.putText(im0, str(int(conf.item() * 100)) + '%',
                                     (d[0], d[1] - 5), self.font, 0.6, (0, 0, 0), 1, cv2.LINE_AA)
 
                 self.vid_writer.write(im0)
 
         return np.array(dets_results)
-
-    def logging_count_num(self, cnt_down, save_dir, movie_path):
-        pass

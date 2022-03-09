@@ -1,11 +1,6 @@
 # -*- coding: utf-8 -*-
-import os
-import torch.backends.cudnn as cudnn
 import argparse
 from counter import Counter
-import time
-
-cudnn.benchmark = True
 
 
 def main():
@@ -24,7 +19,7 @@ def main():
     parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
     parser.add_argument('--augment', action='store_true', help='augmented inference')
     parser.add_argument('--update', action='store_true', help='update all models')
-    parser.add_argument('--project', default='runs/detect', help='save results to project/name')
+    parser.add_argument('--project', default='results', help='save results to project/name')
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--tracking_alg', '-t', type=str, default='iou', help="iou or sort")
@@ -39,5 +34,4 @@ def main():
 
 
 if __name__ == "__main__":
-
     main()

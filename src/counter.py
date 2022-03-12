@@ -179,6 +179,8 @@ class Counter(object):
 
         for path, img, im0s, vid_cap, s in self.dataset:
             self.vid_cap = vid_cap
+            fps = self.vid_cap.get(cv2.CAP_PROP_FPS)
+            print(fps)
 
             img2 = img.copy()
 

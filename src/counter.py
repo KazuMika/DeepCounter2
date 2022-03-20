@@ -20,6 +20,8 @@ from yolov5.utils.datasets import LoadStreams, LoadImages
 from yolov5.utils.general import check_img_size, check_imshow, non_max_suppression, \
     scale_coords, set_logging, increment_path
 from yolov5.utils.torch_utils import select_device
+from yolov5_tensor.yolov5 import Yolov5
+
 
 cudnn.benchmark = True
 
